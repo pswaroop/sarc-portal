@@ -13,8 +13,8 @@ import {
 import { useAuth } from "@/contexts/AuthContext";
 import { differenceInCalendarDays, format } from "date-fns";
 
-// time-elapsed (%) of an assignment window
-function elapsedPercent(start: string, end: string): number {
+function elapsedPercent(start: string | null, end: string | null): number {
+  if (!start || !end) return 0;
   const total = differenceInCalendarDays(new Date(end), new Date(start));
   const done = differenceInCalendarDays(new Date(), new Date(start));
   if (total <= 0) return 100;
@@ -28,7 +28,6 @@ export default function ManagerDashboard() {
   const { data: employees = [] } = useEmployees();
   const { data: updates = [] } = useDailyUpdates();
 
-  // For Team Lead, scope to their reports; Managers/Admin see all.
   const scoped = useMemo(() => {
     if (!user) return assignments;
     if (user.role === "Team Lead") return assignments.filter((a) => a.reporting_lead_id === user.id);
@@ -54,15 +53,15 @@ export default function ManagerDashboard() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold">Team overview</h1>
+        <h1 className="text-xl font-semibold sm:text-2xl">Team overview</h1>
         <p className="text-sm text-muted-foreground">Track delivery health and surface blockers across your team.</p>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-3 grid-cols-2 xl:grid-cols-4">
         <KpiCard label="Team size" value={teamSize} icon={Users} variant="info" />
-        <KpiCard label="Active assignments" value={activeAssignments} icon={Briefcase} variant="primary" />
-        <KpiCard label="Active blockers" value={blockers.length} icon={AlertOctagon} variant="destructive" hint="Needs attention" />
-        <KpiCard label="At-risk projects" value={atRisk} icon={AlertTriangle} variant="warning" hint=">20% behind schedule" />
+        <KpiCard label="Active" value={activeAssignments} icon={Briefcase} variant="primary" />
+        <KpiCard label="Blockers" value={blockers.length} icon={AlertOctagon} variant="destructive" hint="Needs attention" />
+        <KpiCard label="At risk" value={atRisk} icon={AlertTriangle} variant="warning" hint=">20% behind" />
       </div>
 
       <div className="grid gap-6 lg:grid-cols-3">
@@ -72,14 +71,17 @@ export default function ManagerDashboard() {
             <p className="text-xs text-muted-foreground">Compares time elapsed vs actual completion. Flags &gt;20% lag.</p>
           </CardHeader>
           <CardContent className="space-y-4">
+            {tracked.length === 0 && <p className="text-sm text-muted-foreground">No assignments yet.</p>}
             {tracked.map((t) => {
               const lagging = t.variance <= -20;
               return (
                 <div key={t.id} className="rounded-lg border bg-card/40 p-4">
                   <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-                    <div>
-                      <div className="text-sm font-medium">{projectName(t.project_id)}</div>
-                      <div className="text-xs text-muted-foreground">{employeeName(t.employee_id)} · Due {format(new Date(t.end_date), "MMM d")}</div>
+                    <div className="min-w-0">
+                      <div className="truncate text-sm font-medium">{projectName(t.project_id)}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {employeeName(t.employee_id)}{t.end_date && ` · Due ${format(new Date(t.end_date), "MMM d")}`}
+                      </div>
                     </div>
                     {lagging ? (
                       <StatusBadge label={`Lagging ${Math.abs(t.variance)}%`} variant="destructive" />

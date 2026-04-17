@@ -1,47 +1,92 @@
 import { createContext, useContext, useEffect, useMemo, useState, ReactNode } from "react";
-import { employees as mockEmployees } from "@/mocks/data";
+import { supabase } from "@/integrations/supabase/client";
+import type { Session, User } from "@supabase/supabase-js";
 import type { Employee, Role } from "@/types";
 
 interface AuthContextValue {
+  session: Session | null;
   user: Employee | null;
-  login: (email: string) => boolean;
-  logout: () => void;
-  setRole: (role: Role) => void; // dev helper for previewing roles
+  loading: boolean;
+  signIn: (email: string, password: string) => Promise<{ error?: string }>;
+  signOut: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
-const STORAGE_KEY = "staffarc.auth.userId";
+async function fetchProfile(authUser: User): Promise<Employee | null> {
+  const [{ data: emp }, { data: roleRow }] = await Promise.all([
+    supabase
+      .from("employees")
+      .select("id, employee_code, full_name, primary_skill, created_at")
+      .eq("id", authUser.id)
+      .maybeSingle(),
+    supabase.from("user_roles").select("role").eq("user_id", authUser.id),
+  ]);
+
+  if (!emp) return null;
+
+  const rank = (r: Role) => (r === "Admin" ? 1 : r === "Manager" ? 2 : r === "Team Lead" ? 3 : 4);
+  const role: Role =
+    (roleRow ?? [])
+      .map((r: { role: Role }) => r.role)
+      .sort((a, b) => rank(a) - rank(b))[0] ?? "Employee";
+
+  return {
+    id: emp.id,
+    employee_code: emp.employee_code,
+    full_name: emp.full_name,
+    primary_skill: emp.primary_skill,
+    role,
+    email: authUser.email ?? undefined,
+    created_at: emp.created_at,
+  };
+}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [userId, setUserId] = useState<string | null>(() => {
-    if (typeof window === "undefined") return null;
-    return localStorage.getItem(STORAGE_KEY);
-  });
+  const [session, setSession] = useState<Session | null>(null);
+  const [user, setUser] = useState<Employee | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (userId) localStorage.setItem(STORAGE_KEY, userId);
-    else localStorage.removeItem(STORAGE_KEY);
-  }, [userId]);
-
-  const user = useMemo(() => mockEmployees.find((e) => e.id === userId) ?? null, [userId]);
-
-  const value: AuthContextValue = {
-    user,
-    login: (email: string) => {
-      const found = mockEmployees.find((e) => e.email.toLowerCase() === email.toLowerCase());
-      if (found) {
-        setUserId(found.id);
-        return true;
+    // CRITICAL: subscribe BEFORE getSession to avoid race
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, sess) => {
+      setSession(sess);
+      if (sess?.user) {
+        // Defer Supabase calls outside the listener
+        setTimeout(() => {
+          fetchProfile(sess.user).then(setUser);
+        }, 0);
+      } else {
+        setUser(null);
       }
-      return false;
-    },
-    logout: () => setUserId(null),
-    setRole: (role: Role) => {
-      const candidate = mockEmployees.find((e) => e.role === role);
-      if (candidate) setUserId(candidate.id);
-    },
-  };
+    });
+
+    supabase.auth.getSession().then(async ({ data: { session: sess } }) => {
+      setSession(sess);
+      if (sess?.user) setUser(await fetchProfile(sess.user));
+      setLoading(false);
+    });
+
+    return () => sub.subscription.unsubscribe();
+  }, []);
+
+  const value = useMemo<AuthContextValue>(
+    () => ({
+      session,
+      user,
+      loading,
+      signIn: async (email, password) => {
+        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        return { error: error?.message };
+      },
+      signOut: async () => {
+        await supabase.auth.signOut();
+        setUser(null);
+        setSession(null);
+      },
+    }),
+    [session, user, loading]
+  );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

@@ -1,17 +1,8 @@
-// React Query hooks for StaffArc.
-// All hooks use mock data today, but their signatures match the future
-// Supabase calls so swapping is mechanical.
+// React Query hooks backed by Supabase.
+// Signatures preserved so pages need no rewrites beyond schema field renames.
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import {
-  attendance as mockAttendance,
-  dailyUpdates as mockDailyUpdates,
-  employees as mockEmployees,
-  projectAssignments as mockAssignments,
-  projectFinancials as mockFinancials,
-  projects as mockProjects,
-  tickets as mockTickets,
-} from "@/mocks/data";
+import { supabase } from "@/integrations/supabase/client";
 import type {
   Attendance,
   DailyUpdate,
@@ -24,8 +15,6 @@ import type {
   TicketState,
 } from "@/types";
 
-const wait = <T,>(data: T, ms = 120) => new Promise<T>((r) => setTimeout(() => r(data), ms));
-
 export const queryKeys = {
   employees: ["employees"] as const,
   projects: ["projects"] as const,
@@ -36,36 +25,118 @@ export const queryKeys = {
   financials: ["financials"] as const,
 };
 
+// ---------- Queries ----------
+
 export const useEmployees = () =>
-  useQuery({ queryKey: queryKeys.employees, queryFn: () => wait<Employee[]>(mockEmployees) });
+  useQuery({
+    queryKey: queryKeys.employees,
+    queryFn: async (): Promise<Employee[]> => {
+      const { data: emps, error } = await supabase
+        .from("employees")
+        .select("id, employee_code, full_name, primary_skill, created_at");
+      if (error) throw error;
+      const { data: roles } = await supabase.from("user_roles").select("user_id, role");
+      const roleByUser = new Map<string, Role>();
+      (roles ?? []).forEach((r: { user_id: string; role: Role }) => {
+        const cur = roleByUser.get(r.user_id);
+        const rank = (x: Role) =>
+          x === "Admin" ? 1 : x === "Manager" ? 2 : x === "Team Lead" ? 3 : 4;
+        if (!cur || rank(r.role) < rank(cur)) roleByUser.set(r.user_id, r.role);
+      });
+      return (emps ?? []).map((e) => ({
+        id: e.id,
+        employee_code: e.employee_code,
+        full_name: e.full_name,
+        primary_skill: e.primary_skill,
+        role: roleByUser.get(e.id) ?? "Employee",
+        created_at: e.created_at,
+      }));
+    },
+  });
 
 export const useProjects = () =>
-  useQuery({ queryKey: queryKeys.projects, queryFn: () => wait<Project[]>(mockProjects) });
+  useQuery({
+    queryKey: queryKeys.projects,
+    queryFn: async (): Promise<Project[]> => {
+      const { data, error } = await supabase.from("projects").select("*").order("created_at", { ascending: false });
+      if (error) throw error;
+      return (data ?? []) as Project[];
+    },
+  });
 
 export const useAssignments = () =>
-  useQuery({ queryKey: queryKeys.assignments, queryFn: () => wait<ProjectAssignment[]>(mockAssignments) });
+  useQuery({
+    queryKey: queryKeys.assignments,
+    queryFn: async (): Promise<ProjectAssignment[]> => {
+      const { data, error } = await supabase.from("project_assignments").select("*");
+      if (error) throw error;
+      return (data ?? []) as ProjectAssignment[];
+    },
+  });
 
 export const useDailyUpdates = () =>
-  useQuery({ queryKey: queryKeys.dailyUpdates, queryFn: () => wait<DailyUpdate[]>(mockDailyUpdates) });
+  useQuery({
+    queryKey: queryKeys.dailyUpdates,
+    queryFn: async (): Promise<DailyUpdate[]> => {
+      const { data, error } = await supabase
+        .from("daily_updates")
+        .select("*")
+        .order("date", { ascending: false });
+      if (error) throw error;
+      return (data ?? []) as DailyUpdate[];
+    },
+  });
 
 export const useAttendance = () =>
-  useQuery({ queryKey: queryKeys.attendance, queryFn: () => wait<Attendance[]>(mockAttendance) });
+  useQuery({
+    queryKey: queryKeys.attendance,
+    queryFn: async (): Promise<Attendance[]> => {
+      const { data, error } = await supabase
+        .from("attendance")
+        .select("*")
+        .order("date", { ascending: false });
+      if (error) throw error;
+      return (data ?? []) as Attendance[];
+    },
+  });
 
 export const useTickets = () =>
-  useQuery({ queryKey: queryKeys.tickets, queryFn: () => wait<Ticket[]>(mockTickets) });
+  useQuery({
+    queryKey: queryKeys.tickets,
+    queryFn: async (): Promise<Ticket[]> => {
+      const { data, error } = await supabase
+        .from("tickets")
+        .select("*")
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return (data ?? []) as Ticket[];
+    },
+  });
 
 export const useFinancials = () =>
-  useQuery({ queryKey: queryKeys.financials, queryFn: () => wait<ProjectFinancial[]>(mockFinancials) });
+  useQuery({
+    queryKey: queryKeys.financials,
+    queryFn: async (): Promise<ProjectFinancial[]> => {
+      const { data, error } = await supabase.from("project_financials").select("*");
+      if (error) {
+        // Non-admins will get RLS denials — return empty silently.
+        if (error.code === "PGRST301" || error.message.toLowerCase().includes("permission")) return [];
+        throw error;
+      }
+      return (data ?? []) as ProjectFinancial[];
+    },
+    retry: false,
+  });
 
-// ---- Mutations (operate on in-memory mock arrays) ----
+// ---------- Mutations ----------
 
 export const useSubmitDailyUpdate = () => {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (update: Omit<DailyUpdate, "id">) => {
-      const newUpdate: DailyUpdate = { ...update, id: `d-${Date.now()}` };
-      mockDailyUpdates.unshift(newUpdate);
-      return wait(newUpdate);
+      const { data, error } = await supabase.from("daily_updates").insert(update).select().single();
+      if (error) throw error;
+      return data;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.dailyUpdates }),
   });
@@ -75,9 +146,11 @@ export const useUpdateTicketState = () => {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, state }: { id: string; state: TicketState }) => {
-      const t = mockTickets.find((x) => x.id === id);
-      if (t) t.state = state;
-      return wait(t);
+      const { error } = await supabase
+        .from("tickets")
+        .update({ state, updated_at: new Date().toISOString() })
+        .eq("id", id);
+      if (error) throw error;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.tickets }),
   });
@@ -87,9 +160,11 @@ export const useReassignTicket = () => {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, employeeId }: { id: string; employeeId: string }) => {
-      const t = mockTickets.find((x) => x.id === id);
-      if (t) t.assigned_to = employeeId;
-      return wait(t);
+      const { error } = await supabase
+        .from("tickets")
+        .update({ assigned_to: employeeId, updated_at: new Date().toISOString() })
+        .eq("id", id);
+      if (error) throw error;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.tickets }),
   });
@@ -99,9 +174,10 @@ export const useUpdateUserRole = () => {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, role }: { id: string; role: Role }) => {
-      const e = mockEmployees.find((x) => x.id === id);
-      if (e) e.role = role;
-      return wait(e);
+      // Replace existing role rows for the user with the new single role
+      await supabase.from("user_roles").delete().eq("user_id", id);
+      const { error } = await supabase.from("user_roles").insert({ user_id: id, role });
+      if (error) throw error;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.employees }),
   });
@@ -111,10 +187,10 @@ export const useUpdateFinancial = () => {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (next: ProjectFinancial) => {
-      const idx = mockFinancials.findIndex((f) => f.project_id === next.project_id);
-      if (idx >= 0) mockFinancials[idx] = next;
-      else mockFinancials.push(next);
-      return wait(next);
+      const { error } = await supabase
+        .from("project_financials")
+        .upsert({ ...next, updated_at: new Date().toISOString() }, { onConflict: "project_id" });
+      if (error) throw error;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.financials }),
   });
@@ -124,11 +200,10 @@ export const useCheckIn = () => {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (entry: Omit<Attendance, "id">) => {
-      const today = entry.date;
-      const existing = mockAttendance.find((a) => a.employee_id === entry.employee_id && a.date === today);
-      if (existing) existing.status = entry.status;
-      else mockAttendance.unshift({ ...entry, id: `att-${Date.now()}` });
-      return wait(entry);
+      const { error } = await supabase
+        .from("attendance")
+        .upsert(entry, { onConflict: "employee_id,date" });
+      if (error) throw error;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.attendance }),
   });
@@ -138,10 +213,22 @@ export const useCreateAssignment = () => {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (a: Omit<ProjectAssignment, "id">) => {
-      const created: ProjectAssignment = { ...a, id: `a-${Date.now()}` };
-      mockAssignments.unshift(created);
-      return wait(created);
+      const { data, error } = await supabase.from("project_assignments").insert(a).select().single();
+      if (error) throw error;
+      return data;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.assignments }),
+  });
+};
+
+export const useCreateTicket = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (t: Omit<Ticket, "id" | "created_at" | "updated_at">) => {
+      const { data, error } = await supabase.from("tickets").insert(t).select().single();
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.tickets }),
   });
 };

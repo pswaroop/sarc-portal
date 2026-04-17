@@ -1,7 +1,7 @@
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
-import { Bell, LogOut } from "lucide-react";
+import { LogOut } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -10,18 +10,21 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import type { Role } from "@/types";
 import { StatusBadge, statusToVariant } from "@/components/StatusBadge";
-
-const ROLES: Role[] = ["Admin", "Manager", "Team Lead", "Employee"];
+import { useNavigate } from "react-router-dom";
 
 export function Topbar() {
-  const { user, logout, setRole } = useAuth();
+  const { user, signOut } = useAuth();
+  const navigate = useNavigate();
   if (!user) return null;
 
+  const handleSignOut = async () => {
+    await signOut();
+    navigate("/login", { replace: true });
+  };
+
   return (
-    <header className="sticky top-0 z-40 flex h-14 items-center gap-3 border-b bg-background/80 px-4 backdrop-blur">
+    <header className="sticky top-0 z-40 flex h-14 items-center gap-2 border-b bg-background/80 px-3 backdrop-blur sm:px-4">
       <SidebarTrigger className="text-foreground" />
 
       <div className="ml-1 hidden md:block">
@@ -31,40 +34,27 @@ export function Topbar() {
       </div>
 
       <div className="ml-auto flex items-center gap-2">
-        {/* Dev role switcher — preview each role without auth */}
-        <div className="hidden items-center gap-2 sm:flex">
-          <span className="text-xs text-muted-foreground">View as</span>
-          <Select value={user.role} onValueChange={(v) => setRole(v as Role)}>
-            <SelectTrigger className="h-8 w-[130px] text-xs">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {ROLES.map((r) => (
-                <SelectItem key={r} value={r} className="text-xs">{r}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        <StatusBadge label={user.role} variant={statusToVariant(user.role)} />
-
-        <Button variant="ghost" size="icon" className="h-9 w-9">
-          <Bell className="h-4 w-4" />
-        </Button>
+        <StatusBadge label={user.role} variant={statusToVariant(user.role)} className="hidden sm:inline-flex" />
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <button className="grid h-9 w-9 place-items-center rounded-full bg-gradient-brand text-sm font-semibold text-primary-foreground">
+            <button
+              aria-label="Account menu"
+              className="grid h-9 w-9 place-items-center rounded-full bg-gradient-brand text-sm font-semibold text-primary-foreground"
+            >
               {user.full_name.charAt(0)}
             </button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-52">
+          <DropdownMenuContent align="end" className="w-56">
             <DropdownMenuLabel>
               <div className="text-sm font-medium">{user.full_name}</div>
-              <div className="text-xs text-muted-foreground">{user.email}</div>
+              <div className="truncate text-xs text-muted-foreground">{user.email}</div>
+              <div className="mt-1 sm:hidden">
+                <StatusBadge label={user.role} variant={statusToVariant(user.role)} />
+              </div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={logout} className="text-destructive">
+            <DropdownMenuItem onClick={handleSignOut} className="text-destructive">
               <LogOut className="mr-2 h-4 w-4" /> Sign out
             </DropdownMenuItem>
           </DropdownMenuContent>

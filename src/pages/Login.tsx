@@ -7,40 +7,35 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { useAuth } from "@/contexts/AuthContext";
 import { BrandLogo } from "@/components/BrandLogo";
 import { toast } from "@/hooks/use-toast";
-import { employees } from "@/mocks/data";
-import type { Role } from "@/types";
-
-const QUICK_ROLES: Role[] = ["Admin", "Manager", "Team Lead", "Employee"];
+import { Loader2 } from "lucide-react";
 
 export default function Login() {
-  const { user, login, setRole } = useAuth();
+  const { user, signIn, loading } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
   if (user) {
     const from = (location.state as { from?: { pathname: string } } | null)?.from?.pathname ?? "/dashboard";
     return <Navigate to={from} replace />;
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (login(email)) {
-      toast({ title: "Welcome back", description: "Signed in to StaffArc." });
-      navigate("/dashboard", { replace: true });
-    } else {
+    setSubmitting(true);
+    const { error } = await signIn(email, password);
+    setSubmitting(false);
+    if (error) {
       toast({
-        title: "User not found",
-        description: "Try a quick-login below or use a known email like aarav@staffarc.io",
+        title: "Sign-in failed",
+        description: error,
         variant: "destructive",
       });
+      return;
     }
-  };
-
-  const quickLogin = (role: Role) => {
-    setRole(role);
-    toast({ title: `Signed in as ${role}`, description: "Demo mode" });
+    toast({ title: "Welcome back", description: "Signed in to StaffArc." });
     navigate("/dashboard", { replace: true });
   };
 
@@ -51,7 +46,7 @@ export default function Login() {
         <div className="absolute -right-32 bottom-10 h-96 w-96 rounded-full bg-accent/20 blur-3xl" />
       </div>
 
-      <div className="relative mx-auto flex min-h-screen max-w-md flex-col items-center justify-center px-4">
+      <div className="relative mx-auto flex min-h-screen w-full max-w-md flex-col items-center justify-center px-4 py-8">
         <div className="mb-6">
           <BrandLogo size={48} />
         </div>
@@ -70,6 +65,7 @@ export default function Login() {
                 <Input
                   id="email"
                   type="email"
+                  autoComplete="email"
                   placeholder="you@staffarc.io"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
@@ -81,35 +77,25 @@ export default function Login() {
                 <Input
                   id="password"
                   type="password"
+                  autoComplete="current-password"
                   placeholder="••••••••"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
+                  required
                 />
               </div>
-              <Button type="submit" className="w-full bg-gradient-brand text-primary-foreground hover:opacity-90">
+              <Button
+                type="submit"
+                disabled={submitting || loading}
+                className="w-full bg-gradient-brand text-primary-foreground hover:opacity-90"
+              >
+                {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Sign in
               </Button>
             </form>
 
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center">
-                <span className="w-full border-t" />
-              </div>
-              <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-card px-2 text-muted-foreground">Demo quick-login</span>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-2">
-              {QUICK_ROLES.map((r) => (
-                <Button key={r} variant="outline" size="sm" onClick={() => quickLogin(r)}>
-                  {r}
-                </Button>
-              ))}
-            </div>
-
             <p className="text-center text-xs text-muted-foreground">
-              Try: <span className="font-mono">{employees[0].email}</span>
+              Need access? Ask an Admin to invite you from the Users page.
             </p>
           </CardContent>
         </Card>
