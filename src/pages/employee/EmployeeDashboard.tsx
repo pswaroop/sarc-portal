@@ -30,8 +30,7 @@ export default function EmployeeDashboard() {
   );
   const projectName = (id: string) => projects.find((p) => p.id === id)?.name ?? "—";
 
-  // Daily update form state
-  const [projectId, setProjectId] = useState<string>(myAssignments[0]?.project_id ?? "");
+  const [projectId, setProjectId] = useState<string>("");
   const [completed, setCompleted] = useState("");
   const [inProgress, setInProgress] = useState("");
   const [planned, setPlanned] = useState("");
@@ -40,7 +39,10 @@ export default function EmployeeDashboard() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user || !projectId) return;
+    if (!user || !projectId) {
+      toast({ title: "Pick a project first", variant: "destructive" });
+      return;
+    }
     await submit.mutateAsync({
       employee_id: user.id,
       project_id: projectId,
@@ -49,7 +51,7 @@ export default function EmployeeDashboard() {
       in_progress: inProgress,
       planned,
       has_blocker: hasBlocker,
-      blocker_description: hasBlocker ? blocker : undefined,
+      blocker_description: hasBlocker ? blocker : null,
     });
     toast({ title: "Update submitted", description: "Your daily update was saved." });
     setCompleted(""); setInProgress(""); setPlanned(""); setHasBlocker(false); setBlocker("");
@@ -58,12 +60,11 @@ export default function EmployeeDashboard() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold">My Workspace</h1>
+        <h1 className="text-xl font-semibold sm:text-2xl">My Workspace</h1>
         <p className="text-sm text-muted-foreground">Your active assignments, tickets, and daily check-in.</p>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-3">
-        {/* Left: Active assignments + tickets */}
         <div className="space-y-6 lg:col-span-2">
           <Card>
             <CardHeader className="pb-2">
@@ -78,12 +79,14 @@ export default function EmployeeDashboard() {
                 return (
                   <div key={a.id} className="rounded-lg border bg-card/50 p-4">
                     <div className="mb-2 flex items-start justify-between gap-3">
-                      <div>
-                        <div className="font-medium">{project?.name}</div>
-                        <div className="text-xs text-muted-foreground flex items-center gap-2 mt-1">
-                          <CalendarDays className="h-3 w-3" />
-                          Due {format(new Date(a.end_date), "MMM d, yyyy")}
-                          <span>· {a.allocation_percentage}% allocation</span>
+                      <div className="min-w-0">
+                        <div className="truncate font-medium">{project?.name}</div>
+                        <div className="mt-1 flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
+                          <span className="flex items-center gap-1">
+                            <CalendarDays className="h-3 w-3" />
+                            {a.end_date ? `Due ${format(new Date(a.end_date), "MMM d, yyyy")}` : "No due date"}
+                          </span>
+                          {a.allocation_percentage != null && <span>· {a.allocation_percentage}%</span>}
                         </div>
                       </div>
                       <StatusBadge label={`${a.completion_percentage}%`} variant="primary" />
@@ -96,8 +99,8 @@ export default function EmployeeDashboard() {
           </Card>
 
           <Card>
-            <CardHeader className="pb-2 flex-row items-center justify-between space-y-0">
-              <h2 className="text-base font-semibold flex items-center gap-2">
+            <CardHeader className="flex-row items-center justify-between space-y-0 pb-2">
+              <h2 className="flex items-center gap-2 text-base font-semibold">
                 <TicketIcon className="h-4 w-4" /> Recent tickets
               </h2>
             </CardHeader>
@@ -109,10 +112,10 @@ export default function EmployeeDashboard() {
                   {myTickets.map((t) => (
                     <li key={t.id} className="flex items-center justify-between gap-3 py-3">
                       <div className="min-w-0">
-                        <div className="text-sm font-medium truncate">{t.title}</div>
-                        <div className="text-xs text-muted-foreground font-mono">{t.ticket_number}</div>
+                        <div className="truncate text-sm font-medium">{t.title}</div>
+                        <div className="font-mono text-xs text-muted-foreground">{t.ticket_number}</div>
                       </div>
-                      <div className="flex items-center gap-2 shrink-0">
+                      <div className="flex shrink-0 items-center gap-2">
                         <StatusBadge label={t.priority} variant={statusToVariant(t.priority)} />
                         <StatusBadge label={t.state} variant={statusToVariant(t.state)} />
                       </div>
@@ -124,8 +127,7 @@ export default function EmployeeDashboard() {
           </Card>
         </div>
 
-        {/* Right: Submit daily update */}
-        <Card className="lg:sticky lg:top-20 h-fit">
+        <Card className="h-fit lg:sticky lg:top-20">
           <CardHeader className="pb-2">
             <h2 className="text-base font-semibold">Submit daily update</h2>
             <p className="text-xs text-muted-foreground">{format(new Date(), "EEEE, MMM d")}</p>
@@ -138,7 +140,7 @@ export default function EmployeeDashboard() {
                   <SelectTrigger><SelectValue placeholder="Select project" /></SelectTrigger>
                   <SelectContent>
                     {myAssignments.map((a) => (
-                      <SelectItem key={a.project_id} value={a.project_id}>{projectName(a.project_id)}</SelectItem>
+                      <SelectItem key={a.id} value={a.project_id}>{projectName(a.project_id)}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
