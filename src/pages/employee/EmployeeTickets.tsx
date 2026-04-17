@@ -6,11 +6,12 @@ import { StatusBadge, statusToVariant } from "@/components/StatusBadge";
 import type { Ticket, TicketState } from "@/types";
 import { Button } from "@/components/ui/button";
 
-const COLUMNS: TicketState[] = ["New", "In Progress", "Resolved", "Closed"];
+const COLUMNS: TicketState[] = ["New", "In Progress", "On Hold", "Resolved", "Closed"];
 
 const NEXT_STATE: Record<TicketState, TicketState | null> = {
   New: "In Progress",
   "In Progress": "Resolved",
+  "On Hold": "In Progress",
   Resolved: "Closed",
   Closed: null,
 };
@@ -22,7 +23,9 @@ export default function EmployeeTickets() {
 
   const mine = useMemo(() => tickets.filter((t) => t.assigned_to === user?.id), [tickets, user]);
   const grouped = useMemo(() => {
-    const map: Record<TicketState, Ticket[]> = { New: [], "In Progress": [], Resolved: [], Closed: [] };
+    const map: Record<TicketState, Ticket[]> = {
+      New: [], "In Progress": [], "On Hold": [], Resolved: [], Closed: [],
+    };
     mine.forEach((t) => map[t.state].push(t));
     return map;
   }, [mine]);
@@ -30,11 +33,11 @@ export default function EmployeeTickets() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold">My tickets</h1>
+        <h1 className="text-xl font-semibold sm:text-2xl">My tickets</h1>
         <p className="text-sm text-muted-foreground">Move tickets through the workflow as you work.</p>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
         {COLUMNS.map((col) => (
           <Card key={col} className="bg-card/60">
             <CardHeader className="pb-2">
@@ -53,12 +56,16 @@ export default function EmployeeTickets() {
                       <StatusBadge label={t.priority} variant={statusToVariant(t.priority)} />
                     </div>
                     <div className="mt-1 text-sm font-medium">{t.title}</div>
-                    <div className="mt-1 text-xs text-muted-foreground line-clamp-2">{t.description}</div>
-                    <div className="mt-2 flex items-center justify-between">
+                    {t.description && (
+                      <div className="mt-1 text-xs text-muted-foreground line-clamp-2">{t.description}</div>
+                    )}
+                    <div className="mt-2 flex items-center justify-between gap-2">
                       <StatusBadge label={t.category} variant="neutral" />
                       {next && (
                         <Button
-                          size="sm" variant="ghost" className="h-7 text-xs"
+                          size="sm"
+                          variant="ghost"
+                          className="h-7 shrink-0 text-xs"
                           onClick={() => update.mutate({ id: t.id, state: next })}
                         >
                           → {next}

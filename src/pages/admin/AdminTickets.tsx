@@ -7,8 +7,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useEmployees, useReassignTicket, useTickets, useUpdateTicketState } from "@/hooks/useStaffArcData";
 import type { TicketPriority, TicketState } from "@/types";
 
-const STATES: TicketState[] = ["New", "In Progress", "Resolved", "Closed"];
-const PRIORITIES: TicketPriority[] = ["Low", "Medium", "High", "Critical"];
+const STATES: TicketState[] = ["New", "In Progress", "On Hold", "Resolved", "Closed"];
+const PRIORITIES: TicketPriority[] = ["Low", "Moderate", "High", "Critical"];
 
 export default function AdminTickets() {
   const { data: tickets = [] } = useTickets();
@@ -81,8 +81,8 @@ export default function AdminTickets() {
                     </Select>
                   </TableCell>
                   <TableCell>
-                    <Select value={t.assigned_to} onValueChange={(v) => reassign.mutate({ id: t.id, employeeId: v })}>
-                      <SelectTrigger className="h-8 w-44 text-xs"><SelectValue /></SelectTrigger>
+                    <Select value={t.assigned_to ?? undefined} onValueChange={(v) => reassign.mutate({ id: t.id, employeeId: v })}>
+                      <SelectTrigger className="h-8 w-44 text-xs"><SelectValue placeholder="Unassigned" /></SelectTrigger>
                       <SelectContent>
                         {employees.map((e) => <SelectItem key={e.id} value={e.id} className="text-xs">{e.full_name}</SelectItem>)}
                       </SelectContent>

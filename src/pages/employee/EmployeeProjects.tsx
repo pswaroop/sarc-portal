@@ -53,21 +53,25 @@ export default function EmployeeProjects() {
                   <div className="mb-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">
                     Features
                   </div>
-                  <ul className="space-y-1.5">
-                    {a.features.map((f) => (
-                      <li key={f} className="flex items-start gap-2 text-sm">
-                        <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary" />
-                        <span>{f}</span>
-                      </li>
-                    ))}
-                  </ul>
+                  {a.features ? (
+                    <ul className="space-y-1.5">
+                      {a.features.split(/[\n,]/).map((f) => f.trim()).filter(Boolean).map((f) => (
+                        <li key={f} className="flex items-start gap-2 text-sm">
+                          <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary" />
+                          <span>{f}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">No features listed.</p>
+                  )}
                 </div>
 
                 <div className="rounded-lg border bg-muted/30 p-3">
                   <div className="mb-1 flex items-center gap-2 text-xs font-medium text-muted-foreground">
                     <MessageSquare className="h-3.5 w-3.5" /> Lead comments
                   </div>
-                  <p className="text-sm">{a.lead_comments}</p>
+                  <p className="text-sm">{a.lead_comments || "No comments yet."}</p>
                 </div>
               </CardContent>
             </Card>

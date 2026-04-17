@@ -19,7 +19,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Pencil, UserPlus } from "lucide-react";
@@ -27,8 +26,8 @@ import type { BillingType, PaymentStatus, ProjectFinancial } from "@/types";
 import { toast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 
-const BILLING: BillingType[] = ["Fixed", "Hourly", "Retainer"];
-const PAYMENT: PaymentStatus[] = ["Pending", "Partial", "Paid", "Overdue"];
+const BILLING: BillingType[] = ["Fixed Price", "Time & Material", "Retainer"];
+const PAYMENT: PaymentStatus[] = ["Pending", "Partial", "Paid"];
 
 export default function AdminProjects() {
   const { data: projects = [] } = useProjects();
@@ -54,14 +53,18 @@ export default function AdminProjects() {
 
   const openEdit = (projectId: string) => {
     const existing = finByProject.get(projectId);
-    setDraft(existing ?? {
-      project_id: projectId,
-      client_name: "",
-      project_worth: 0,
-      currency: "USD",
-      billing_type: "Fixed",
-      payment_status: "Pending",
-    });
+    setDraft(
+      existing ?? {
+        project_id: projectId,
+        client_name: "",
+        client_contact_person: null,
+        client_email: null,
+        project_worth: 0,
+        currency: "INR",
+        billing_type: "Fixed Price",
+        payment_status: "Pending",
+      }
+    );
     setEditProjectId(projectId);
   };
 
@@ -81,7 +84,8 @@ export default function AdminProjects() {
 
   const saveAssign = async () => {
     if (!assignProjectId || !assignEmpId || !assignLeadId) {
-      toast({ title: "Missing fields", variant: "destructive" }); return;
+      toast({ title: "Missing fields", variant: "destructive" });
+      return;
     }
     const project = projects.find((p) => p.id === assignProjectId)!;
     await createAssignment.mutateAsync({
@@ -89,10 +93,11 @@ export default function AdminProjects() {
       employee_id: assignEmpId,
       reporting_lead_id: assignLeadId,
       allocation_percentage: assignAlloc,
-      start_date: project.start_date,
+      start_date: new Date().toISOString().slice(0, 10),
       end_date: project.deadline,
       completion_percentage: 0,
-      features: [],
+      latest_status: null,
+      features: "",
       lead_comments: "",
     });
     toast({ title: "Employee assigned" });
@@ -102,7 +107,7 @@ export default function AdminProjects() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold">Projects registry</h1>
+        <h1 className="text-xl font-semibold sm:text-2xl">Projects registry</h1>
         <p className="text-sm text-muted-foreground">Manage projects, financials, and team assignments.</p>
       </div>
 
@@ -111,7 +116,8 @@ export default function AdminProjects() {
           <h2 className="text-base font-semibold">All projects</h2>
         </CardHeader>
         <CardContent className="overflow-x-auto p-0">
-          <Table>
+          {/* Desktop table */}
+          <Table className="hidden md:table">
             <TableHeader>
               <TableRow>
                 <TableHead>Project</TableHead>
@@ -134,11 +140,11 @@ export default function AdminProjects() {
                     <TableCell className="font-medium">{p.name}</TableCell>
                     <TableCell><StatusBadge label={p.status} variant={statusToVariant(p.status)} /></TableCell>
                     <TableCell className="text-sm text-muted-foreground">{fin?.client_name ?? "—"}</TableCell>
-                    <TableCell>{fin ? `${fin.currency} ${fin.project_worth.toLocaleString()}` : "—"}</TableCell>
+                    <TableCell>{fin && fin.project_worth != null ? `${fin.currency} ${Number(fin.project_worth).toLocaleString()}` : "—"}</TableCell>
                     <TableCell className="text-sm">{fin?.billing_type ?? "—"}</TableCell>
-                    <TableCell>{fin ? <StatusBadge label={fin.payment_status} variant={statusToVariant(fin.payment_status)} /> : "—"}</TableCell>
+                    <TableCell>{fin?.payment_status ? <StatusBadge label={fin.payment_status} variant={statusToVariant(fin.payment_status)} /> : "—"}</TableCell>
                     <TableCell>{team}</TableCell>
-                    <TableCell className="text-sm text-muted-foreground">{format(new Date(p.deadline), "MMM d, yyyy")}</TableCell>
+                    <TableCell className="text-sm text-muted-foreground">{p.deadline ? format(new Date(p.deadline), "MMM d, yyyy") : "—"}</TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-1">
                         <Button size="sm" variant="ghost" onClick={() => openEdit(p.id)}><Pencil className="h-3.5 w-3.5" /></Button>
@@ -148,14 +154,46 @@ export default function AdminProjects() {
                   </TableRow>
                 );
               })}
+              {projects.length === 0 && (
+                <TableRow><TableCell colSpan={9} className="py-8 text-center text-sm text-muted-foreground">No projects yet.</TableCell></TableRow>
+              )}
             </TableBody>
           </Table>
+
+          {/* Mobile cards */}
+          <div className="space-y-3 p-4 md:hidden">
+            {projects.length === 0 && <p className="text-sm text-muted-foreground">No projects yet.</p>}
+            {projects.map((p) => {
+              const fin = finByProject.get(p.id);
+              const team = assignments.filter((a) => a.project_id === p.id).length;
+              return (
+                <div key={p.id} className="rounded-lg border bg-card/40 p-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <div className="truncate font-medium">{p.name}</div>
+                      <div className="text-xs text-muted-foreground">{fin?.client_name ?? "—"}</div>
+                    </div>
+                    <StatusBadge label={p.status} variant={statusToVariant(p.status)} />
+                  </div>
+                  <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
+                    <div><span className="text-muted-foreground">Worth: </span>{fin?.project_worth != null ? `${fin.currency} ${Number(fin.project_worth).toLocaleString()}` : "—"}</div>
+                    <div><span className="text-muted-foreground">Team: </span>{team}</div>
+                    <div><span className="text-muted-foreground">Billing: </span>{fin?.billing_type ?? "—"}</div>
+                    <div><span className="text-muted-foreground">Due: </span>{p.deadline ? format(new Date(p.deadline), "MMM d") : "—"}</div>
+                  </div>
+                  <div className="mt-3 flex gap-2">
+                    <Button size="sm" variant="outline" className="flex-1" onClick={() => openEdit(p.id)}><Pencil className="mr-1 h-3.5 w-3.5" /> Edit</Button>
+                    <Button size="sm" variant="outline" className="flex-1" onClick={() => openAssign(p.id)}><UserPlus className="mr-1 h-3.5 w-3.5" /> Assign</Button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </CardContent>
       </Card>
 
-      {/* Edit financials dialog */}
       <Dialog open={!!editProjectId} onOpenChange={(o) => !o && setEditProjectId(null)}>
-        <DialogContent>
+        <DialogContent className="max-w-md">
           <DialogHeader><DialogTitle>Project financials</DialogTitle></DialogHeader>
           {draft && (
             <div className="space-y-3">
@@ -165,8 +203,8 @@ export default function AdminProjects() {
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <Label>Project worth</Label>
-                  <Input type="number" value={draft.project_worth} onChange={(e) => setDraft({ ...draft, project_worth: Number(e.target.value) })} />
+                  <Label>Worth</Label>
+                  <Input type="number" value={draft.project_worth ?? 0} onChange={(e) => setDraft({ ...draft, project_worth: Number(e.target.value) })} />
                 </div>
                 <div className="space-y-1.5">
                   <Label>Currency</Label>
@@ -175,19 +213,27 @@ export default function AdminProjects() {
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <Label>Billing type</Label>
-                  <Select value={draft.billing_type} onValueChange={(v) => setDraft({ ...draft, billing_type: v as BillingType })}>
+                  <Label>Billing</Label>
+                  <Select value={draft.billing_type ?? undefined} onValueChange={(v) => setDraft({ ...draft, billing_type: v as BillingType })}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>{BILLING.map((b) => <SelectItem key={b} value={b}>{b}</SelectItem>)}</SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Payment status</Label>
-                  <Select value={draft.payment_status} onValueChange={(v) => setDraft({ ...draft, payment_status: v as PaymentStatus })}>
+                  <Label>Payment</Label>
+                  <Select value={draft.payment_status ?? undefined} onValueChange={(v) => setDraft({ ...draft, payment_status: v as PaymentStatus })}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>{PAYMENT.map((b) => <SelectItem key={b} value={b}>{b}</SelectItem>)}</SelectContent>
                   </Select>
                 </div>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Contact person</Label>
+                <Input value={draft.client_contact_person ?? ""} onChange={(e) => setDraft({ ...draft, client_contact_person: e.target.value })} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Contact email</Label>
+                <Input type="email" value={draft.client_email ?? ""} onChange={(e) => setDraft({ ...draft, client_email: e.target.value })} />
               </div>
             </div>
           )}
@@ -198,9 +244,8 @@ export default function AdminProjects() {
         </DialogContent>
       </Dialog>
 
-      {/* Assign employee dialog */}
       <Dialog open={!!assignProjectId} onOpenChange={(o) => !o && setAssignProjectId(null)}>
-        <DialogContent>
+        <DialogContent className="max-w-md">
           <DialogHeader><DialogTitle>Assign employee</DialogTitle></DialogHeader>
           <div className="space-y-3">
             <div className="space-y-1.5">
