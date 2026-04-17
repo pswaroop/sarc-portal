@@ -69,7 +69,7 @@ export default function ManagerDashboard() {
         <Card className="lg:col-span-2">
           <CardHeader className="pb-2">
             <h2 className="text-base font-semibold">Automated progress tracker</h2>
-            <p className="text-xs text-muted-foreground">Compares time elapsed vs actual completion. Flags >20% lag.</p>
+            <p className="text-xs text-muted-foreground">Compares time elapsed vs actual completion. Flags &gt;20% lag.</p>
           </CardHeader>
           <CardContent className="space-y-4">
             {tracked.map((t) => {
