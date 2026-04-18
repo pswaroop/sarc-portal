@@ -224,11 +224,142 @@ export const useCreateAssignment = () => {
 export const useCreateTicket = () => {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (t: Omit<Ticket, "id" | "created_at" | "updated_at">) => {
-      const { data, error } = await supabase.from("tickets").insert(t).select().single();
+    mutationFn: async (t: Omit<Ticket, "id" | "ticket_number" | "created_at" | "updated_at">) => {
+      // Auto-generate a random ticket number (e.g. TKT-8F2A)
+      const ticketNumber = `TKT-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
+      
+      const { data, error } = await supabase
+        .from("tickets")
+        .insert({
+          ...t,
+          ticket_number: ticketNumber,
+          assigned_to: t.assigned_to === "unassigned" ? null : t.assigned_to,
+        })
+        .select()
+        .single();
       if (error) throw error;
       return data;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.tickets }),
+  });
+};
+
+// ---------- Additional Admin/Employee CRUD Mutations ----------
+
+export const useCreateProject = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (project: any) => {
+      const { data, error } = await supabase
+        .from("projects")
+        .insert({
+          name: project.name,
+          status: project.status,
+          deadline: project.deadline || null,
+          sprints: project.sprints || null,
+          project_type: project.project_type || null,
+          other_details: project.other_details || null,
+        })
+        .select()
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.projects }),
+  });
+};
+
+export const useDeleteAssignment = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("project_assignments").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.assignments }),
+  });
+};
+
+export const useDeleteProject = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      // Deleting a project automatically cascades to assignments and financials via SQL
+      const { error } = await supabase.from("projects").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.projects });
+      qc.invalidateQueries({ queryKey: queryKeys.assignments });
+      qc.invalidateQueries({ queryKey: queryKeys.financials });
+    },
+  });
+};
+
+export const useDeleteTicket = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("tickets").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.tickets }),
+  });
+};
+
+export const useUpdateEmployee = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, payload }: { id: string; payload: Partial<Employee> }) => {
+      const { error } = await supabase
+        .from("employees")
+        .update({
+          full_name: payload.full_name,
+          employee_code: payload.employee_code,
+          primary_skill: payload.primary_skill,
+        })
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.employees }),
+  });
+};
+
+export const useUpdateProject = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (p: Partial<Project> & { id: string }) => {
+      const { error } = await supabase.from("projects").update(p).eq("id", p.id);
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.projects }),
+  });
+};
+
+export const useUpdateTicketFull = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (t: Partial<Ticket> & { id: string }) => {
+      const { error } = await supabase
+        .from("tickets")
+        .update({ ...t, updated_at: new Date().toISOString() })
+        .eq("id", t.id);
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.tickets }),
+  });
+};
+
+export const useUpdateAssignment = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (a: Partial<ProjectAssignment> & { id: string }) => {
+      const { error } = await supabase
+        .from("project_assignments")
+        .update(a)
+        .eq("id", a.id);
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.assignments }),
   });
 };

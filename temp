@@ -1,0 +1,18 @@
+python manage.py shell -c "from orders.models import Order; print(list(Order.objects.filter(payment_status='paid', items__variant__product__name__icontains='24016').distinct().values('id', 'order_number', 'payment_status')))"
+
+[{'id': 249, 'order_number': 'IUS4JOYX', 'payment_status': 'paid'}, 
+{'id': 273, 'order_number': 'E0HGEV7C', 'payment_status': 'paid'}, 
+{'id': 277, 'order_number': 'W9OONMFC', 'payment_status': 'paid'}, 
+{'id': 291, 'order_number': 'N5BDHYEY', 'payment_status': 'paid'}, 
+{'id': 296, 'order_number': 'P982CJWB', 'payment_status': 'paid'}, 
+{'id': 297, 'order_number': 'P0PR7LU3', 'payment_status': 'paid'}, 
+{'id': 310, 'order_number': '9BEV338N', 'payment_status': 'paid'}, 
+{'id': 317, 'order_number': 'YKC1JBXE', 'payment_status': 'paid'}, 
+{'id': 318, 'order_number': 'KI2PO5Q9', 'payment_status': 'paid'}, 
+{'id': 343, 'order_number': 'GG2ZHHYZ', 'payment_status': 'paid'}]
+
+*/5 * * * * cd /home/deploy/projects/baba_textiles/backend && /home/deploy/projects/baba_textiles/backend/venv/bin/python manage.py cleanup_expired_orders >> /var/log/django-cleanup.log 2>&1
+
+Current Issues and required enhancements:
+
+1. In admin dashboard, admin is not able to edit all fields in the project registry and also for project registry I want two additional fields along with worth, advance and balance, and paid flag, if paid flag is unchecked only advance amount should be added to the portfolio amount in the global overview, and also I am not able to create ticket, ticket modal is opening up but when I click on create ticket its not getting created
