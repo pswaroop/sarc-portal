@@ -859,7 +859,7 @@ export default function AdminProjects() {
   const [assignProjectId, setAssignProjectId] = useState<string>("");
   const [assignEmpId, setAssignEmpId] = useState<string>("");
   const [assignLeadId, setAssignLeadId] = useState<string>("");
-  const [assignAlloc, setAssignAlloc] = useState<number>(50);
+  const [assignAlloc, setAssignAlloc] = useState<number>(100);
 
   // Assignment Edit Modal
   const [editAssignOpen, setEditAssignOpen] = useState(false);
@@ -998,7 +998,7 @@ export default function AdminProjects() {
     setAssignProjectSearch("");
     setAssignEmpId("");
     setAssignLeadId("");
-    setAssignAlloc(50);
+    setAssignAlloc(100);
     setAssignOpen(true);
   };
 
