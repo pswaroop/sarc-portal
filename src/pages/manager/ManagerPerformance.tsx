@@ -742,7 +742,12 @@ export default function ManagerPerformance() {
       }
 
       return teamMembers.map((emp) => {
-        const empAssign = scoped.filter((a) => a.employee_id === emp.id);
+       const empAssign = scoped.filter((a) => {
+  if (a.employee_id !== emp.id) return false;
+  const proj = projects.find(p => p.id === a.project_id);
+  // Exclude Backlog projects from performance calculation
+  return proj?.status !== "Backlog";
+});
 
         let totalWeight = 0;
         let weightedDeliveryScoreSum = 0;
@@ -887,6 +892,9 @@ export default function ManagerPerformance() {
       .filter((a) => a.completion_percentage < 100 && a.end_date && teamMembers.some(tm => tm.id === a.employee_id))
       .map((a) => {
         const p = projects.find((proj) => proj.id === a.project_id);
+        // NEW LINE: Skip Backlog projects entirely
+        if (p?.status === "Backlog") return null;
+
         const endDate = new Date(a.end_date!);
         const diff = differenceInCalendarDays(endDate, now);
         
