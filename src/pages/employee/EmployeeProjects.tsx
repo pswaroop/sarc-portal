@@ -539,11 +539,22 @@ export default function EmployeeProjects() {
 
   // Aggressively check every possible place the date could be hiding, 
   // ignoring empty strings or literal "null" strings
-  const effectiveDeadline = 
-    (a.end_date && a.end_date.trim() !== "" && a.end_date !== "null") ? a.end_date :
-    (p?.deadline && p.deadline.trim() !== "" && p.deadline !== "null") ? p.deadline : 
-    ((p as any)?.end_date && (p as any).end_date.trim() !== "") ? (p as any).end_date : 
-    null;
+  const effectiveDeadline =
+                          // 1. Always prioritize the live parent project deadline
+                          p?.deadline &&
+                          p.deadline.trim() !== "" &&
+                          p.deadline !== "null"
+                            ? p.deadline
+                            : // 2. Fallback to the assignment's end date if project deadline is empty
+                              a.end_date &&
+                                a.end_date.trim() !== "" &&
+                                a.end_date !== "null"
+                              ? a.end_date
+                              : // 3. Fallback edge cases
+                                (p as any)?.end_date &&
+                                  (p as any).end_date.trim() !== ""
+                                ? (p as any).end_date
+                                : null;
 
   return (
     <div className="flex flex-col">
