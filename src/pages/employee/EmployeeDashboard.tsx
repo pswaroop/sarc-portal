@@ -610,11 +610,13 @@ export default function EmployeeDashboard() {
                         </div>
                         <div className="mt-1 flex flex-col sm:flex-row sm:items-center gap-y-1 gap-x-2 text-xs text-muted-foreground">
                           <span className="flex items-center gap-1.5">
-                            <CalendarDays className="h-3.5 w-3.5" />
-                            {a.end_date
-                              ? `Due ${format(new Date(a.end_date), "MMM d, yyyy")}`
-                              : "No due date"}
-                          </span>
+  <CalendarDays className="h-3.5 w-3.5" />
+  {project?.deadline 
+    ? `Due ${format(new Date(project.deadline), "MMM d, yyyy")}`
+    : a.end_date 
+      ? `Due ${format(new Date(a.end_date), "MMM d, yyyy")}` 
+      : "No due date"}
+</span>
                           {a.allocation_percentage != null && (
                             <span className="hidden sm:inline">· {a.allocation_percentage}% Allocation</span>
                           )}
